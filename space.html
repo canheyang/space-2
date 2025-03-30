@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>12轮选择演示</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #ffffff;
+      text-align: center;
+    }
+    #question-container {
+      margin: 20px auto;
+      padding: 20px;
+    }
+    .choice-image {
+      width: 200px;
+      cursor: pointer;
+      margin: 0 10px;
+    }
+    .choice-image:hover {
+      border: 2px solid blue;
+    }
+  </style>
+</head>
+<body>
+  <h1>欢迎来到 12 轮选择测试 阿诺粉丝大聚会</h1>
+    <div id="start-section">
+      <button id="btn-start" style="padding: 10px 20px; font-size: 16px;">开始选择</button>
+    </div>
+  
+    <div id="question-container" style="display: none;">
+      <!-- 这里将逐轮显示问题和图片 -->
+    </div>
+
+  <div id="summary" style="display: none;">
+    <h2>你的选择结果：</h2>
+    <div id="my-choices"></div>
+
+    <button id="btn-global-stats">查看全球统计</button>
+    <div id="global-stats"></div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    // 导入Firebase所需的函数
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.2/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore.js";
+
+    // Firebase配置
+    const firebaseConfig = {
+      apiKey: "AIzaSyBBxd64ysJd2nDY0WjwkrZBB0n7N7yDzOk",
+      authDomain: "tes-affc9.firebaseapp.com",
+      projectId: "tes-affc9",
+      storageBucket: "tes-affc9.firebasestorage.app",
+      messagingSenderId: "833110229338",
+      appId: "1:833110229338:web:97109354ec06136012f363"
+    };
+
+    // 初始化Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // 定义12道题或图片选项
+    const questions = [
+      { id: 1, text: "第1轮：你选鸡腿(A)还是香肠(B)？", imgA: "img1A.jpg", imgB: "img1B.jpg" },
+      { id: 2, text: "第2轮：选无糖可乐 or 有糖可乐", imgA: "img2A.jpg", imgB: "img2B.jpg" },
+      /* ... 省略中间 10 轮 ... */
+      { id: 12, text: "第12轮：选 A or B", imgA: "img12A.jpg", imgB: "img12B.jpg" }
+    ];
+
+    let currentIndex = 0;
+    const userChoices = [];
+
+    const questionContainer = document.getElementById("question-container");
+    const summaryDiv = document.getElementById("summary");
+    const myChoicesDiv = document.getElementById("my-choices");
+    const globalStatsDiv = document.getElementById("global-stats");
+    const btnGlobalStats = document.getElementById("btn-global-stats");
+    const btnStart = document.getElementById("btn-start");
+
+    // 添加开始按钮点击事件
+    btnStart.addEventListener("click", function() {
+      document.getElementById("start-section").style.display = "none";
+      questionContainer.style.display = "block";
+      showQuestion(currentIndex);
+    });
+
+    function showQuestion(index) {
+      if (index >= questions.length) {
+        showSummary();
+        return;
+      }
+
+      const q = questions[index];
+      questionContainer.innerHTML = `
+        <h2>${q.text}</h2>
+        <div>
+          <img src="${q.imgA}" alt="A" class="choice-image" onclick="selectOption('${q.id}', 'A')" />
+          <img src="${q.imgB}" alt="B" class="choice-image" onclick="selectOption('${q.id}', 'B')" />
+        </div>
+      `;
+    }
+
+    // 用户点击选项时执行
+    window.selectOption = function(questionId, choice) {
+      userChoices.push({ questionId, choice });
+      currentIndex++;
+      showQuestion(currentIndex);
+    }
+
+    function showSummary() {
+      questionContainer.style.display = "none";
+      summaryDiv.style.display = "block";
+
+      let html = "<ul>";
+      userChoices.forEach(item => {
+        html += `<li>题目ID: ${item.questionId}, 选择: ${item.choice}</li>`;
+      });
+      html += "</ul>";
+      myChoicesDiv.innerHTML = html;
+
+      saveUserChoices(userChoices);
+    }
+
+    // 把用户选择存到Firestore
+    async function saveUserChoices(choices) {
+      try {
+        const docRef = await addDoc(collection(db, "choices"), {
+          timestamp: new Date(),
+          choices: choices
+        });
+        console.log("Document written with ID: ", docRef.id);
+      } catch (e) {
+        console.error("Error adding document: ", e);
+      }
+    }
+
+    // 获取全球统计
+    btnGlobalStats.addEventListener("click", async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "choices"));
+        const allDocs = [];
+        querySnapshot.forEach((doc) => {
+          allDocs.push(doc.data());
+        });
+
+        const stats = {};
+        allDocs.forEach(doc => {
+          doc.choices.forEach(({ questionId, choice }) => {
+            if (!stats[questionId]) {
+              stats[questionId] = { A: 0, B: 0 };
+            }
+            if (choice === 'A') stats[questionId].A++;
+            else if (choice === 'B') stats[questionId].B++;
+          });
+        });
+
+        let resultHtml = "<h3>全球选择统计：</h3>";
+        for (let qId in stats) {
+          const aCount = stats[qId].A;
+          const bCount = stats[qId].B;
+          resultHtml += `<p>题目${qId} => A:${aCount} 次, B:${bCount} 次</p>`;
+        }
+        globalStatsDiv.innerHTML = resultHtml;
+      } catch (error) {
+        console.error("Error fetching global stats: ", error);
+      }
+    });
+  </script>
+</body>
+</html>
